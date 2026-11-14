@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "toni-sdk"
+version = "0.1.0"
+description = "Toni SDK for Python: the AI agent for the self-employed and business owners. 260+ business functions built in (CRM, offers, invoices, content, AI co-workers). Works on its own or inside OpenClaw and Hermes Agent."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Stefan Haab" }]
+keywords = ["toni", "ki-markt", "ai-agent", "agent-sdk", "llm", "openai-compatible", "mcp", "openclaw", "hermes-agent", "crm", "automation", "ki", "assistant"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://ki-markt.com"
+Documentation = "https://ki-markt.com/api-referenz"
+Repository = "https://github.com/stefanhaab/toni-sdk-python"
+Issues = "https://github.com/stefanhaab/toni-sdk-python/issues"
+
+[project.scripts]
+toni = "toni_sdk.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+toni_sdk = ["py.typed", "_generated/catalog.json"]
