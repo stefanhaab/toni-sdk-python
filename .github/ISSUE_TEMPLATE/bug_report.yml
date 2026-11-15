@@ -1,0 +1,31 @@
+name: Bug report
+description: Something in the SDK does not work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what came back? Remove your key from everything you paste.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code to reproduce
+      render: text
+  - type: input
+    id: sdk
+    attributes:
+      label: SDK version
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Python version and operating system
+  - type: input
+    id: error
+    attributes:
+      label: Error code
+      description: The `code` and the HTTP status of the error, if there was one.

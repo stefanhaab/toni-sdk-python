@@ -17,7 +17,7 @@ VERSION = "0.1.0"
 DEFAULT_BASE_URL = "https://api.ki-markt.com/v1"
 
 _WIEDERHOLEN = {429, 502, 503, 504}
-_SCHLUESSEL_FEHLT = "Der Schlüssel fehlt. Übergib `api_key` oder setze die Umgebungsvariable TONI_API_KEY (km_live_…)."
+_SCHLUESSEL_FEHLT = "Der Schlüssel fehlt. Übergib `api_key`, setze die Umgebungsvariable TONI_API_KEY (km_live_…) oder nutze im Terminal `toni login`."
 
 
 def _pause(versuch: int) -> float:

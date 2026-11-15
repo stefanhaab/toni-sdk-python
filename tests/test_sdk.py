@@ -266,6 +266,65 @@ class SdkTest(unittest.TestCase):
         with self.assertRaises(ToniError):
             toni.agent(areas=["gibt_es_nicht"])
 
+    def test_terminal_login_logout_verbinden(self):
+        import contextlib
+        import io
+        import stat
+        import tempfile
+        from toni_sdk import cli
+
+        def toni(*args):
+            aus, err = io.StringIO(), io.StringIO()
+            code = 0
+            argv = sys.argv
+            sys.argv = ["toni", *args]
+            try:
+                with contextlib.redirect_stdout(aus), contextlib.redirect_stderr(err):
+                    cli.main()
+            except SystemExit as e:
+                code = e.code
+            finally:
+                sys.argv = argv
+            return code, aus.getvalue(), err.getvalue()
+
+        alt = {k: os.environ.pop(k, None) for k in ("TONI_API_KEY", "KM_KEY", "XDG_CONFIG_HOME", "TONI_BASE_URL")}
+        with tempfile.TemporaryDirectory() as ordner:
+            os.environ["XDG_CONFIG_HOME"] = ordner
+            os.environ["TONI_BASE_URL"] = self.basis
+            datei = os.path.join(ordner, "toni", "config.json")
+            try:
+                anfragen.clear()
+                antworten[:] = [{"status": 401, "body": {"error": {"message": "Falsch.", "type": "authentication_error", "param": None, "code": "invalid_api_key"}}}]
+                code, _, err = toni("login", "km_live_falsch")
+                self.assertEqual(code, 1)
+                self.assertIn("nicht angenommen", err)
+                self.assertFalse(os.path.exists(datei))
+
+                antworten[:] = [{"body": {"object": "list", "data": []}}]
+                self.assertEqual(toni("login", "km_live_gespeichert")[0], 0)
+                with open(datei, encoding="utf-8") as f:
+                    self.assertEqual(json.load(f)["api_key"], "km_live_gespeichert")
+                self.assertEqual(stat.S_IMODE(os.stat(datei).st_mode), 0o600)
+
+                anfragen.clear()
+                self.assertEqual(toni("--bereiche", "crm", "Hallo")[1].strip(), "Hallo.")
+                self.assertEqual(anfragen[0]["headers"]["authorization"], "Bearer km_live_gespeichert")
+
+                self.assertIn("gelöscht", toni("logout")[1])
+                self.assertFalse(os.path.exists(datei))
+                self.assertIn("toni login", toni("Hallo")[2])
+
+                hermes = toni("verbinden", "hermes")[1]
+                self.assertIn("https://app.landingpage.tools/mcp", hermes)
+                self.assertIn("mcp_servers", hermes)
+                self.assertIn("streamable-http", toni("verbinden", "openclaw")[1])
+            finally:
+                for k in ("XDG_CONFIG_HOME", "TONI_BASE_URL"):
+                    os.environ.pop(k, None)
+                for k, v in alt.items():
+                    if v is not None:
+                        os.environ[k] = v
+
 
 if __name__ == "__main__":
     unittest.main()

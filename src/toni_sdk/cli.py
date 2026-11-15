@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
+from pathlib import Path
 from typing import List, Optional
 
-from . import Toni, ToniError, VERSION, catalog
+from . import AuthenticationError, Toni, ToniError, VERSION, catalog
 
 HILFE = f"""toni {VERSION} — Toni im Terminal (https://ki-markt.com)
 
@@ -13,6 +15,9 @@ HILFE = f"""toni {VERSION} — Toni im Terminal (https://ki-markt.com)
   toni                                           Gespräch (beenden mit Strg+D)
   toni funktionen [suche]                        Funktionen der Plattform auflisten
   toni preise                                    Größen und Preise
+  toni login                                     Schlüssel einmal speichern
+  toni logout                                    gespeicherten Schlüssel löschen
+  toni verbinden hermes|openclaw                 Toni in Hermes Agent oder OpenClaw einbinden
 
 Optionen:
   --bereiche crm,offers   nur diese Bereiche (sonst sucht Toni selbst im Katalog)
@@ -21,7 +26,71 @@ Optionen:
   --alles                 zusätzlich löschen und veröffentlichen, jeweils mit Rückfrage
   --leise                 Werkzeugaufrufe nicht anzeigen
 
-Schlüssel: Umgebungsvariable TONI_API_KEY (km_live_…), aus dem Konto unter „API“."""
+Schlüssel: `toni login` oder Umgebungsvariable TONI_API_KEY (km_live_…), aus dem Konto unter „API“."""
+
+MCP_ADRESSE = "https://app.landingpage.tools/mcp"
+VERBINDEN = {
+    "hermes": f"""# ~/.hermes/config.yaml
+mcp_servers:
+  toni:
+    url: "{MCP_ADRESSE}"
+    headers:
+      Authorization: "Bearer lpt_…"
+""".rstrip(),
+    "openclaw": f"""// Block mcp.servers deiner OpenClaw-Konfiguration, prüfen mit: openclaw mcp probe
+{{
+  "mcp": {{
+    "servers": {{
+      "toni": {{
+        "url": "{MCP_ADRESSE}",
+        "transport": "streamable-http",
+        "headers": {{ "Authorization": "Bearer lpt_…" }}
+      }}
+    }}
+  }}
+}}""",
+}
+VERBINDEN_HINWEIS = """
+Den Verbindungs-Schlüssel (lpt_…) erzeugst du im Download-Bereich deines Kontos
+unter „KI-Assistent verbinden“. Er ist ein anderer als der API-Schlüssel (km_live_…)."""
+
+
+def ablage() -> Path:
+    """Ablage des Schlüssels: $XDG_CONFIG_HOME/toni/config.json, sonst ~/.config/toni/config.json."""
+    basis = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(basis) / "toni" / "config.json"
+
+
+def gespeicherter_schluessel() -> Optional[str]:
+    try:
+        k = json.loads(ablage().read_text(encoding="utf-8")).get("api_key")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return k if isinstance(k, str) and k else None
+
+
+def _login(vorgabe: Optional[str]) -> None:
+    key = (vorgabe or "").strip()
+    if not key:
+        if sys.stdin.isatty():
+            key = input("API-Schlüssel (km_live_…, aus dem Konto unter „API“): ").strip()
+        else:
+            key = sys.stdin.read().strip()
+    if not key:
+        raise ToniError("Kein Schlüssel eingegeben.")
+    try:
+        Toni(key).models.list()
+    except AuthenticationError:
+        raise ToniError("Dieser Schlüssel wird nicht angenommen. Gespeichert wurde nichts.") from None
+    except ToniError:
+        sys.stderr.write("Der Schlüssel ließ sich gerade nicht prüfen. Er wird trotzdem gespeichert.\n")
+    datei = ablage()
+    datei.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd = os.open(str(datei), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"api_key": key}, indent=2) + "\n")
+    os.chmod(str(datei), 0o600)
+    print(f'Gespeichert in {datei}. Probier: toni "Wer hat sich diese Woche gemeldet?"')
 
 
 def _lauf(args: List[str]) -> None:
@@ -61,7 +130,20 @@ def _lauf(args: List[str]) -> None:
                 print(f'  {f["name"]:<38} {f["level"]:<17} {f["title"]}')
         return None
 
-    toni = Toni()
+    if args[:1] == ["login"]:
+        return _login(args[1] if len(args) > 1 else None)
+    if args[:1] == ["logout"]:
+        da = ablage().exists()
+        if da:
+            ablage().unlink()
+        return print("Der gespeicherte Schlüssel ist gelöscht." if da else "Es war kein Schlüssel gespeichert.")
+    if args[:1] == ["verbinden"]:
+        text = VERBINDEN.get(args[1].lower() if len(args) > 1 else "")
+        if not text:
+            return print(f'{VERBINDEN["hermes"]}\n\n{VERBINDEN["openclaw"]}\n{VERBINDEN_HINWEIS}')
+        return print(f"{text}\n{VERBINDEN_HINWEIS}")
+
+    toni = Toni(os.environ.get("TONI_API_KEY") or os.environ.get("KM_KEY") or gespeicherter_schluessel())
     if args[:1] == ["preise"]:
         for m in toni.prices().get("data", []):
             print(f'{m.get("id", ""):<22} {str(m.get("name", "")):<16} {json.dumps(m.get("preis"), ensure_ascii=False)}')

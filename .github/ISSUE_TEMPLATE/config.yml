@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: API reference
+    url: https://ki-markt.com/api-referenz
+    about: Every endpoint and every platform function, with parameters.
+  - name: Security problem
+    url: https://github.com/stefanhaab/toni-sdk-python/security/advisories/new
+    about: Please report vulnerabilities privately, not as an issue.
